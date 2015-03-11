@@ -59,6 +59,11 @@ public class Enquirer implements IEnquirer {
             // Idem para "nao"
             else if ("nao".equals(resposta))
                 respostasPossiveis.retainAll(pergunta.getNaos());
+            // Senão, remover qualquer um que tenha respondido a pergunta, já que o animal procurado não o fez
+            else {
+                respostasPossiveis.removeAll(pergunta.getSims());
+                respostasPossiveis.removeAll(pergunta.getNaos());
+            }
 
             // Se sobrou somente uma opção, parar de fazer perguntas
             if (respostasPossiveis.size() <= 1)
