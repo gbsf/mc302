@@ -1,46 +1,101 @@
 package pt.c02classes.s01knowledge.s02app.actors;
 
-import java.util.Scanner;
-
 import pt.c02classes.s01knowledge.s01base.inter.IEnquirer;
 import pt.c02classes.s01knowledge.s01base.inter.IResponder;
+import pt.c02classes.s01knowledge.s02app.maze.PointOfInterest;
+import pt.c02classes.s01knowledge.s02app.util.Direction;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.EnumSet;
 
 public class EnquirerMaze implements IEnquirer {
 
-	IResponder responder;
-	
-	public void connect(IResponder responder) {
-		this.responder = responder;
-	}
-	
-	public boolean discover() {
-		Scanner scanner = new Scanner(System.in);
-		
-		System.out.print("(P)ergunta, (M)ovimento ou (F)im? ");
-		String tipo = scanner.nextLine();
-		while (!tipo.equalsIgnoreCase("F")) {
-		   System.out.print("  --> ");
-		   String pc = scanner.nextLine();
-		   switch (tipo.toUpperCase()) {
-		      case "P": String resposta = responder.ask(pc);
-		                System.out.println("  Resposta: " + resposta);
-		                break;
-		      case "M": boolean moveu = responder.move(pc);
-		                System.out.println((moveu)?"  Movimento executado!":"Não é possível mover");
-		                break;
-		   }
-			System.out.print("(P)ergunta, (M)ovimento ou (F)im? ");
-			tipo = scanner.nextLine();
-		}
-		
-		if (responder.finalAnswer("cheguei"))
-			System.out.println("Você encontrou a saida!");
-		else
-			System.out.println("Fuém fuém fuém!");
-		
-		scanner.close();
-		
-		return true;
-	}
-	
+    IResponder responder;
+
+    public void connect(IResponder responder) {
+        this.responder = responder;
+    }
+
+    public boolean discover() {
+        Deque<PointOfInterest> stack = new ArrayDeque<>();
+
+        PointOfInterest poi = new PointOfInterest(Direction.SOUTH, 0);
+        poi.setAvailable(avaliableDirections());
+        stack.push(poi);
+
+        loop:
+        while (!"saida".equals(responder.ask("aqui"))) {
+
+            poi = stack.peek();
+
+            EnumSet<Direction> directions = poi.getAvailable();
+            directions.remove(poi.getFrom());
+
+            while (directions.size() == 1 && directions.contains(poi.getFromRev())) {
+                poi.incrDistance();
+                responder.move(poi.getFromRev().getDir());
+
+                if ("saida".equals(responder.ask("aqui")))
+                    break loop;
+
+
+                avaliableDirections(directions);
+                directions.remove(poi.getFrom());
+            }
+
+            // Beco sem saÃ­da
+            if (directions.isEmpty()) {
+                // O stack nÃ£o pode estar vazio
+                assert !stack.isEmpty();
+                stack.pop();
+
+                Direction back = poi.getFrom();
+                // Voltar atÃ© o Ãºltimo ponto de interesse
+                for (int i = 0, steps = poi.getDistance(); i < steps; i++)
+                    responder.move(back.getDir());
+
+                continue;
+            }
+
+            // Estamos em uma encruzilhada, virar sempre Ã  direita
+            Direction dir = poi.getFrom().previous();
+            while (!directions.contains(dir))
+                dir = dir.previous();
+            directions.remove(dir);
+            poi.setAvailable(directions);
+
+            responder.move(dir.getDir());
+            poi = new PointOfInterest(dir.reverse(), 1);
+            poi.setAvailable(avaliableDirections());
+            stack.push(poi);
+
+        }
+
+        boolean resposta = responder.finalAnswer("aqui");
+
+        if (resposta)
+            System.out.println("VocÃª encontrou a saida!");
+        else
+            System.out.println("FuÃ©m fuÃ©m fuÃ©m!");
+
+        return resposta;
+    }
+
+    private EnumSet<Direction> avaliableDirections() {
+        return avaliableDirections(EnumSet.noneOf(Direction.class));
+    }
+
+    private EnumSet<Direction> avaliableDirections(EnumSet<Direction> directions) {
+        directions.clear();
+
+        for (Direction dir : Direction.values()) {
+            String answer = responder.ask(dir.getDir());
+            if (!("parede".equals(answer) || "mundo".equals(answer)))
+                directions.add(dir);
+        }
+
+        return directions;
+    }
+
 }
